@@ -1,0 +1,121 @@
+# ==============================================================================
+# WEDA-LLM-BASE Pipeline — Docker Compose
+# ==============================================================================
+name: weda-llm-base
+
+services:
+  weda-llm:
+    # ── OPTION A: Build from local Dockerfile (Uncomment to use) ───────────────
+    # build:
+    #   context: .
+    #   args:
+    #     - BASE_IMAGE=${WEDA_LLM_IMAGE}
+    # image: weda-llm-dev:latest
+    # ──────────────────────────────────────────────────────────────────────────
+
+    # ── OPTION B: Run prebuilt image from registry (Default) ──────────────────
+    image: ${WEDA_LLM_IMAGE}
+    # ──────────────────────────────────────────────────────────────────────────
+    container_name: ${WEDA_LLM_CONTAINER_NAME:-weda-edge-llm}
+    #uncomment it to use the local image, do not use it if you want to pull from registry
+    #pull_policy: never
+    # the supervisor exits with vLLM's code when the server dies; compose brings it back
+    restart: unless-stopped
+    runtime: nvidia
+    ipc: host
+    network_mode: host
+    entrypoint: [ "/wise-edge/weda-llm-base/entrypoint.sh" ]
+    init: true          # PID 1 = tini: reaps vLLM worker orphans, forwards signals to the supervisor
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu, utility, compute, video, display ]
+    environment:
+      # ── Model Configuration ──────────────────────────────────────────────────
+      - WEDA_LLM_PORT=${WEDA_LLM_PORT:-9000}
+      # Bind address for the vLLM API. .env alone is not enough -- values
+      # there are only interpolated by compose; a variable reaches the
+      # container only if it is listed here.
+      - WEDA_LLM_HOST=${WEDA_LLM_HOST:-0.0.0.0}
+      # The image bakes the same knobs under these names (its HEALTHCHECK reads them)
+      - L3A_LLM_PORT=${WEDA_LLM_PORT:-9000}
+      - L3A_LLM_HOST=${WEDA_LLM_HOST:-0.0.0.0}
+      # ── HuggingFace ──────────────────────────────────────────────────────────
+      - HF_TOKEN=${HF_TOKEN}
+      - HF_HUB_OFFLINE=${HF_HUB_OFFLINE:-1}
+      - TIKTOKEN_CACHE_DIR=/models/moe-configs/tiktoken
+      - TIKTOKEN_RS_CACHE_DIR=/models/moe-configs/tiktoken
+    volumes:
+      # ── Host timezone ────────────────────────────────────────────────────────
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      # ── Device Access ────────────────────────────────────────────────────────
+      - /dev:/dev:rw
+      # ── Source ───────────────────────────────────────────────────────────────
+      - ./config:/wise-edge/weda-llm-base/config:ro
+      - ./scripts:/wise-edge/weda-llm-base/scripts:ro
+      - ./entrypoint.sh:/wise-edge/weda-llm-base/entrypoint.sh:ro
+      # ── Model Cache ──────────────────────────────────────────────────────────
+      - ${HF_CACHE:-./model_cache/huggingface}:/models/huggingface:rw
+      - ${MOE_CONFIGS_DIR:-./artifacts/moe-configs}:/models/moe-configs:rw
+      - vllm-compile-cache:/root/.cache/vllm:rw
+      # ── Persistent Output ────────────────────────────────────────────────────
+      - ${TEST_LOGS_DIR:-./test_logs}:/wise-edge/weda-llm-base/test_logs:rw
+    working_dir: /wise-edge/weda-llm-base
+    tty: true
+    stdin_open: true
+    command:
+      # - sleep
+      # - infinity
+      - serve
+      # - --kv-cache-dtype=fp8
+      # - --attention-backend=flashinfer
+      # - --enable-chunked-prefill
+      # - --max-num-batched-tokens=8192
+      # - --enable-prefix-caching
+      # - '--compilation-config={"inductor_compile_config":{"freezing":false}}'
+    healthcheck:
+      # the port the server binds; the image's own check reads the L3A_LLM_* copies forwarded above
+      test: ["CMD-SHELL", "curl -fsS http://${PROBE_HOST:-127.0.0.1}:${WEDA_LLM_PORT:-9000}/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      # start_period only suppresses failures until the FIRST successful probe (not for its full
+      # duration once healthy) -- covers the slowest profile's server_ready_sec (3600 s); once healthy,
+      # a hot swap that reloads a slower model can fail probes for 40 x 15s = 10 min before Docker
+      # reports unhealthy, even though the swap itself may still be in progress
+      start_period: 3600s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "${LOG_MAX_SIZE:-20m}"
+        max-file: "${LOG_MAX_FILE:-3}"
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: always
+    network_mode: host
+    depends_on:
+      weda-llm:
+        condition: service_healthy
+    environment:
+      - PORT=3000
+      - OPENAI_API_BASE_URL=http://${PROBE_HOST:-127.0.0.1}:${WEDA_LLM_PORT:-9000}/v1
+      - OPENAI_API_KEY=empty
+      - WEBUI_AUTH=True
+      - ENABLE_SIGNUP=True
+      - DEFAULT_USER_ROLE=user
+      - ENABLE_PERSISTENT_CONFIG=False
+      - BYPASS_MODEL_ACCESS_CONTROL=True
+    volumes:
+      - open-webui:/app/backend/data
+
+volumes:
+  vllm-compile-cache:
+    name: weda-llm-vllm-compile-cache
+  open-webui:
+    name: weda-llm-open-webui-data

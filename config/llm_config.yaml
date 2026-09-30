@@ -1,0 +1,437 @@
+model_cache_dir: "/models/huggingface/hub"
+default_profile: qwen2.5-0.5b-sanity
+profiles:
+
+  # ── Throughput champions (Qwen3-30B-A3B, Marlin INT4 + FP8 KV) ──────────────
+  qwen3-30b-a3b-w4a16-marlin-fp8kv:
+    model: RedHatAI/Qwen3-30B-A3B-quantized.w4a16
+    served_model_name: qwen3-30b-a3b-w4a16-marlin-fp8kv
+    max_model_len: 32768
+    max_num_seqs: 64
+    gpu_memory_utilization: 0.90
+    tensor_parallel_size: 1
+    extra_serve_args:
+    - --enable-auto-tool-choice
+    - --tool-call-parser=hermes
+    - --trust-remote-code
+    - --quantization=compressed-tensors
+    - --kv-cache-dtype=fp8
+    - --max-num-batched-tokens=8192
+    - --enable-chunked-prefill
+    - --attention-backend=flashinfer
+    - --async-scheduling
+    stress:
+      num_requests: 500
+      concurrency: 64
+      prompt_length_tokens: 2048
+      output_length_tokens: 128
+    timeouts:
+      server_ready_sec: 1200
+      per_request_sec: 600
+    expected:
+      throughput_min_tok_per_sec: 220
+
+  qwen3-30b-a3b-w4a16-marlin:
+    model: RedHatAI/Qwen3-30B-A3B-quantized.w4a16
+    served_model_name: qwen3-30b-a3b-w4a16-marlin
+    max_model_len: 32768
+    max_num_seqs: 64
+    gpu_memory_utilization: 0.90
+    tensor_parallel_size: 1
+    extra_serve_args:
+    - --enable-auto-tool-choice
+    - --tool-call-parser=hermes
+    - --trust-remote-code
+    - --quantization=compressed-tensors
+    - --max-num-batched-tokens=8192
+    - --enable-chunked-prefill
+    - --attention-backend=flashinfer
+    - --async-scheduling
+    stress:
+      num_requests: 500
+      concurrency: 64
+      prompt_length_tokens: 2048
+      output_length_tokens: 128
+    timeouts:
+      server_ready_sec: 1200
+      per_request_sec: 600
+    expected:
+      throughput_min_tok_per_sec: 190
+
+  # ── US-origin MoE candidates ─────────────────────────────────────────────────
+  nemotron3-nano-30b-a3b-nvfp4:
+    model: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-NVFP4
+    served_model_name: nemotron3-nano-30b-a3b-nvfp4
+    max_model_len: 32768
+    max_num_seqs: 64
+    gpu_memory_utilization: 0.85
+    tensor_parallel_size: 1
+    nvfp4_gemm_backend: cutlass
+    revision: ce1b118ae66ec705d02c241525192832eb045fd3
+    extra_serve_args:
+    - --enable-auto-tool-choice
+    - --tool-call-parser=hermes
+    - --trust-remote-code
+    - --kv-cache-dtype=fp8
+    - --max-num-batched-tokens=8192
+    - --enable-chunked-prefill
+    - --attention-backend=flashinfer
+    - --enable-prefix-caching
+    - --async-scheduling
+    env:
+      VLLM_COMPILER_CACHE_DIR: "/models/huggingface/vllm_compiler_cache"
+      TORCHINDUCTOR_CACHE_DIR: "/models/huggingface/torchinductor_cache"
+    stress:
+      num_requests: 500
+      concurrency: 64
+      prompt_length_tokens: 2048
+      output_length_tokens: 128
+    timeouts:
+      server_ready_sec: 3600
+      per_request_sec: 600
+    expected:
+      throughput_min_tok_per_sec: 180
+
+  gpt-oss-120b-mxfp4:
+    model: openai/gpt-oss-120b
+    served_model_name: gpt-oss-120b-mxfp4
+    max_model_len: 32768
+    max_num_seqs: 64
+    gpu_memory_utilization: 0.85
+    tensor_parallel_size: 1
+    extra_serve_args:
+    - --enable-auto-tool-choice
+    - --trust-remote-code
+    - --tool-call-parser=openai
+    - --kv-cache-dtype=fp8
+    - --enable-chunked-prefill
+    - --max-num-batched-tokens=8192
+    - --async-scheduling
+    env:
+      TIKTOKEN_CACHE_DIR: "/models/moe-configs/tiktoken"
+    stress:
+      num_requests: 100
+      concurrency: 16
+      prompt_length_tokens: 2048
+      output_length_tokens: 128
+    timeouts:
+      server_ready_sec: 1800
+      per_request_sec: 600
+    expected:
+      throughput_min_tok_per_sec: 50
+
+  gpt-oss-120b-marlin:
+    model: openai/gpt-oss-120b
+    served_model_name: gpt-oss-120b-marlin
+    max_model_len: 32768
+    max_num_seqs: 64
+    gpu_memory_utilization: 0.85
+    tensor_parallel_size: 1
+    extra_serve_args:
+    - --enable-auto-tool-choice
+    - --trust-remote-code
+    - --tool-call-parser=openai
+    - --quantization=compressed-tensors
+    - --kv-cache-dtype=fp8
+    - --enable-chunked-prefill
+    - --max-num-batched-tokens=8192
+    - --async-scheduling
+    stress:
+      num_requests: 100
+      concurrency: 16
+      prompt_length_tokens: 2048
+      output_length_tokens: 128
+    timeouts:
+      server_ready_sec: 1800
+      per_request_sec: 600
+    expected:
+      throughput_min_tok_per_sec: 50
+
+  # ── FP4 MoE (NVFP4 format) ───────────────────────────────────────────────────
+  qwen3-30b-a3b-nvfp4:
+    model: nvidia/Qwen3-30B-A3B-NVFP4
+    served_model_name: qwen3-30b-a3b-nvfp4
+    max_model_len: 32768
+    max_num_seqs: 16
+    gpu_memory_utilization: 0.45
+    trust_remote_code: true
+    tensor_parallel_size: 1
+    inductor_freezing: 0
+    fx_graph_cache: 1
+    use_flashinfer_moe_fp4: 0
+    nvfp4_gemm_backend: cutlass
+    extra_serve_args:
+    - --enable-auto-tool-choice
+    - --tool-call-parser=hermes
+    - --kv-cache-dtype=fp8
+    - --attention-backend=flashinfer
+    - --enable-chunked-prefill
+    - --max-num-batched-tokens=8192
+    - --enable-prefix-caching
+    - --compilation-config={"inductor_compile_config":{"freezing":false}}
+    stress:
+      num_requests: 100
+      concurrency: 8
+      prompt_length_tokens: 2048
+      output_length_tokens: 128
+    timeouts:
+      server_ready_sec: 1200
+      per_request_sec: 300
+    expected:
+      throughput_min_tok_per_sec: 150
+
+  gemma4-26b-a4b-nvfp4:
+    model: nvidia/Gemma-4-26B-A4B-NVFP4
+    served_model_name: gemma4-26b-a4b-nvfp4
+    max_model_len: 32768
+    max_num_seqs: 16
+    gpu_memory_utilization: 0.45
+    tensor_parallel_size: 1
+    extra_serve_args:
+    - --enable-auto-tool-choice
+    - --tool-call-parser=hermes
+    - --trust-remote-code
+    - --kv-cache-dtype=fp8
+    - --enable-chunked-prefill
+    - --max-num-batched-tokens=8192
+    - --enable-prefix-caching
+    stress:
+      num_requests: 100
+      concurrency: 8
+      prompt_length_tokens: 2048
+      output_length_tokens: 128
+    timeouts:
+      server_ready_sec: 1200
+      per_request_sec: 300
+    expected:
+      throughput_min_tok_per_sec: 150
+
+  llama3.1-8b-nvfp4:
+    model: nvidia/Llama-3.1-8B-Instruct-NVFP4
+    served_model_name: llama3.1-8b-nvfp4
+    max_model_len: 32768
+    max_num_seqs: 16
+    gpu_memory_utilization: 0.3
+    tensor_parallel_size: 1
+    extra_serve_args:
+    - --enable-auto-tool-choice
+    - --tool-call-parser=llama3_json
+    - --trust-remote-code
+    - --kv-cache-dtype=fp8
+    - --attention-backend=flashinfer
+    - --enable-chunked-prefill
+    - --max-num-batched-tokens=8192
+    - --enable-prefix-caching
+    stress:
+      num_requests: 100
+      concurrency: 8
+      prompt_length_tokens: 2048
+      output_length_tokens: 128
+    timeouts:
+      server_ready_sec: 1200
+      per_request_sec: 300
+    expected:
+      throughput_min_tok_per_sec: 200
+
+  llama3.3-70b-nvfp4:
+    model: nvidia/Llama-3.3-70B-Instruct-NVFP4
+    served_model_name: llama3.3-70b-nvfp4
+    max_model_len: 16384
+    max_num_seqs: 8
+    gpu_memory_utilization: 0.85
+    tensor_parallel_size: 1
+    extra_serve_args:
+    - --enable-auto-tool-choice
+    - --tool-call-parser=llama3_json
+    - --trust-remote-code
+    - --kv-cache-dtype=fp8
+    - --attention-backend=flashinfer
+    - --enable-chunked-prefill
+    - --max-num-batched-tokens=8192
+    - --enable-prefix-caching
+    stress:
+      num_requests: 100
+      concurrency: 8
+      prompt_length_tokens: 2048
+      output_length_tokens: 128
+    timeouts:
+      server_ready_sec: 1200
+      per_request_sec: 300
+    expected:
+      throughput_min_tok_per_sec: 100
+
+  # ── INT4 MoE (AWQ / compressed-tensors, alternate sources) ──────────────────
+  qwen3-30b-a3b-w4a16:
+    model: RedHatAI/Qwen3-30B-A3B-quantized.w4a16
+    served_model_name: qwen3-30b-a3b-w4a16
+    max_model_len: 32768
+    max_num_seqs: 16
+    tensor_parallel_size: 1
+    gpu_memory_utilization: 0.8
+    extra_serve_args:
+    - --enable-auto-tool-choice
+    - --tool-call-parser=hermes
+    - --trust-remote-code
+    - --max-num-batched-tokens=32768
+    - --enable-prefix-caching
+    - --attention-backend=flashinfer
+    stress:
+      num_requests: 100
+      concurrency: 8
+      prompt_length_tokens: 2048
+      output_length_tokens: 128
+    timeouts:
+      server_ready_sec: 1200
+      per_request_sec: 300
+    expected:
+      throughput_min_tok_per_sec: 140
+
+  qwen3-30b-a3b-awq-stelterlab:
+    model: stelterlab/Qwen3-30B-A3B-Instruct-2507-AWQ
+    served_model_name: qwen3-30b-a3b-awq-stelterlab
+    max_model_len: 32768
+    max_num_seqs: 16
+    tensor_parallel_size: 1
+    gpu_memory_utilization: 0.45
+    extra_serve_args:
+    - --enable-auto-tool-choice
+    - --tool-call-parser=hermes
+    - --trust-remote-code
+    - --kv-cache-dtype=fp8
+    - --attention-backend=flashinfer
+    - --enable-chunked-prefill
+    - --max-num-batched-tokens=8192
+    - --enable-prefix-caching
+    stress:
+      num_requests: 100
+      concurrency: 8
+      prompt_length_tokens: 2048
+      output_length_tokens: 128
+    timeouts:
+      server_ready_sec: 1200
+      per_request_sec: 300
+    expected:
+      throughput_min_tok_per_sec: 150
+
+  qwen3-vl-30b-a3b-awq-marlin:
+    model: QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ
+    served_model_name: qwen3-vl-30b-a3b-awq-marlin
+    max_model_len: 32768
+    max_num_seqs: 16
+    tensor_parallel_size: 1
+    gpu_memory_utilization: 0.45
+    extra_serve_args:
+    - --enable-auto-tool-choice
+    - --tool-call-parser=hermes
+    - --trust-remote-code
+    - --kv-cache-dtype=fp8
+    - --quantization=awq_marlin
+    - --attention-backend=flashinfer
+    - --enable-chunked-prefill
+    - --max-num-batched-tokens=8192
+    - --enable-prefix-caching
+    stress:
+      num_requests: 100
+      concurrency: 8
+      prompt_length_tokens: 2048
+      output_length_tokens: 128
+    timeouts:
+      server_ready_sec: 1200
+      per_request_sec: 300
+    expected:
+      throughput_min_tok_per_sec: 140
+
+  qwen3-vl-30b-a3b-awq-marlin-1024-512:
+    model: QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ
+    served_model_name: qwen3-vl-30b-a3b-awq-marlin-1024-512
+    max_model_len: 32768
+    max_num_seqs: 4
+    tensor_parallel_size: 1
+    gpu_memory_utilization: 0.4
+    extra_serve_args:
+    - --enable-auto-tool-choice
+    - --tool-call-parser=hermes
+    - --trust-remote-code
+    - --kv-cache-dtype=fp8
+    - --quantization=awq_marlin
+    - --attention-backend=flashinfer
+    stress:
+      num_requests: 50
+      concurrency: 4
+      prompt_length_tokens: 1024
+      output_length_tokens: 512
+      sustained_seconds: 120
+    timeouts:
+      server_ready_sec: 1200
+      per_request_sec: 600
+    expected:
+      throughput_min_tok_per_sec: 60
+
+  # ── BF16 (unquantized reference) ─────────────────────────────────────────────
+  qwen3-vl-30b-a3b-bf16-1024-256:
+    model: Qwen/Qwen3-VL-30B-A3B-Instruct
+    served_model_name: qwen3-vl-30b-a3b-bf16-1024-256
+    max_model_len: 16384
+    max_num_seqs: 2
+    tensor_parallel_size: 1
+    gpu_memory_utilization: 0.65
+    extra_serve_args:
+    - --enable-auto-tool-choice
+    - --tool-call-parser=hermes
+    - --trust-remote-code
+    - --kv-cache-dtype=fp8
+    - --moe-backend=triton
+    stress:
+      num_requests: 20
+      concurrency: 2
+      prompt_length_tokens: 1024
+      output_length_tokens: 256
+      sustained_seconds: 60
+    timeouts:
+      server_ready_sec: 1200
+      per_request_sec: 600
+    expected:
+      throughput_min_tok_per_sec: 25
+
+  llama3.1-8b-bf16:
+    model: meta-llama/Meta-Llama-3.1-8B-Instruct
+    served_model_name: llama3.1-8b-bf16
+    max_model_len: 8192
+    max_num_seqs: 32
+    gpu_memory_utilization: 0.85
+    trust_remote_code: false
+    tensor_parallel_size: 1
+    inductor_freezing: 1
+    fx_graph_cache: 1
+    extra_serve_args:
+    - --enable-auto-tool-choice
+    - --tool-call-parser=llama3_json
+    - --kv-cache-dtype=fp8
+    - --attention-backend=flashinfer
+    - --enable-chunked-prefill
+
+  # ── Sanity / warmup (excluded from rankings) ─────────────────────────────────
+  qwen2.5-0.5b-sanity:
+    model: Qwen/Qwen2.5-0.5B-Instruct
+    served_model_name: qwen2.5-0.5b-sanity
+    # 32768 accommodates tool-calling: Open WebUI sends the tool schemas with
+    # every request, so even a short prompt like "hi" arrives as ~4097 tokens;
+    # a smaller context length would reject it before generation starts.
+    max_model_len: 32768
+    max_num_seqs: 4
+    gpu_memory_utilization: 0.15
+    tensor_parallel_size: 1
+    extra_serve_args:
+    - --enable-auto-tool-choice
+    - --tool-call-parser=hermes
+    stress:
+      num_requests: 24
+      concurrency: 4
+      prompt_length_tokens: 256
+      output_length_tokens: 128
+      sustained_seconds: 0
+    timeouts:
+      server_ready_sec: 300
+      per_request_sec: 60
+    expected:
+      throughput_min_tok_per_sec: 30
